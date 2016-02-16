@@ -17,48 +17,35 @@ module.exports = function (content) {
         module : {},
         exports : {}
       };
-
-      var mockDefine = function(id, dependencies, obj){
-        if(!obj){
-          if(!dependencies){
-            obj = id;
-          }else{
-            obj = dependencies;
-          }
-        }
-        this.json = obj;
-      };
-
+      
+      var _d = "function define(i, d, o) {if(!o) {if(!d) {return i;}return d;}return o;}"
 
       var vm = require('vm');
       var context = vm.createContext(sandbox);
-      var script = new vm.Script('var define='+mockDefine.toString()+';var ret='+content + ';ret&&!json&&!module.exports&&(json=ret);');
+      var script = new vm.Script(_d+"\nvar ret="+content +";this._json = ret;");
       script.runInContext(context);
+      if(context._json && typeof context._json === 'object') {
+          return context._json;
+      }
       return sandbox.json || (sandbox.module && sandbox.module.exports);
   };
 
   var json = getJsonFromAmdFile(content);
 
-  var ret = {};
-  var coffee;
-  var __content;
+  var ret = {},
+      __content;
 
-  ret.__root = json.root;
+  ret.__root = !json ? {root:true} : json.root;
   for(var language in json){
-    if(language === 'root') continue;
+    if(language === 'root' && typeof json[language] === 'object') {
+        continue;
+    }
     var targetFile = path.join(targetPath,language,targetFileName);
     if(!fs.existsSync(targetFile)){
         this.emitError(targetFile + 'not exist!');
         return;
     }
-
     __content = fs.readFileSync(targetFile,'utf8');
-
-    if (targetFile.match(/\.coffee$/)){
-        if(!coffee) coffee = require('coffee-script');
-        __content = coffee.compile(__content,{ bare: true });
-    }
-
     ret['__' + language] = getJsonFromAmdFile(__content);
   }
 
